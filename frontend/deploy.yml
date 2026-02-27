@@ -1,4 +1,4 @@
-name: Deploy to VM
+name: Build and Deploy
 
 on:
   push:
@@ -6,14 +6,31 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build Backend Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/cv-backend:latest ./backend
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/cv-backend:latest
+
+      - name: Build Frontend Image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/cv-frontend:latest ./frontend
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/cv-frontend:latest
+
+      - name: Deploy to VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -21,6 +38,5 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             cd /home/deploy/CV_Enhancer_With_AI_Docker
-            git pull origin main
-            docker compose down
-            docker compose up --build -d
+            docker compose pull
+            docker compose up -d
